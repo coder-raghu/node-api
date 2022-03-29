@@ -6,6 +6,8 @@ var cors = require('cors')
 var bodyParser = require('body-parser')
 const moment =require('moment');
 const bcrypt = require('bcrypt');
+const multer  = require('multer')
+const upload = multer({ dest: 'uploads/' })
 
 const app = express();              //Instantiate an express app, the main work horse of this server
 const port = 5000;                  //Save the port number where your server will be listening
@@ -17,6 +19,7 @@ var jsonParser = bodyParser.json()
 
 // create application/x-www-form-urlencoded parser
 var urlencodedParser = bodyParser.urlencoded({ extended: false })
+
 
 // Get products list
 app.get('/products', function (req, res) {
@@ -39,11 +42,14 @@ app.post('/product/store', jsonParser, function (req, res) {
 });
 
 // Save product
-app.post('/product/update', jsonParser, function (req, res) {
-    console.log(req.body)
+app.post('/product/update',upload.single('image'),  function (req, res) {
+
+    console.log(req.file);
+    const ext = req.file.mimetype.split("/")[1];
+    let imagePath = req.file.path + '.' +ext;
     const {id,title,price,quantity,description} = req.body;
     const updated_at = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
-    const sql = `UPDATE product SET title = '${title}', price=${price}, qty=${quantity}, description='${description}', updated_at='${updated_at}' WHERE id=${id}`;
+    const sql = `UPDATE product SET title = '${title}', price=${price}, qty=${quantity}, description='${description}',image = '${imagePath}', updated_at='${updated_at}' WHERE id=${id}`;
     console.log(sql)
     db.query(sql, function (err, result, fields) {
         if (err) throw err;
