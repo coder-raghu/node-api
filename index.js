@@ -157,23 +157,27 @@ const getCategories = async () => {
 }
 
 // Save product
-app.post('/product/delete', jsonParser, function (req, res) {
+app.post('/product/delete', jsonParser, async function (req, res) {
     const { id } = req.body;
-    const getData = `SELECT * FROM products where id=${id}`;
-    db.query(getData, function (err, result) {
-        if (err) throw err;
-        if(result[0].image){
-            fs.unlinkSync(result[0].image, function(err){
+    const productDetails = await product.findByPk(id);
+    if(productDetails){
+        const productDeleted = await product.destroy({
+            where: { id }
+        });
+        if(productDetails.image){
+            fs.unlinkSync(productDetails.image, function(err){
                 if(err) throw err;
                 console.log("file deleted");
             });
         }
-    });
-    const sql = `DELETE FROM products where id=${id}`;
-    db.query(sql, function (err, result, fields) {
-        if (err) throw err;
-        res.send(sendResponse(true, 'success', result));
-    });
+        if(productDeleted){
+            res.send(sendResponse(true, 'success', productDetails));
+        } else {
+            res.send(sendResponse(false, 'Oops! something went wrong'));
+        }
+    } else {
+        res.send(sendResponse(false, 'Please pass valid data'));
+    }
 });
 
 // Save product
