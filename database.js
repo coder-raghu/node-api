@@ -1,20 +1,19 @@
-module.exports = function(mysql){
+const { Sequelize } = require('sequelize');
+require('dotenv').config()
 
-    // DB conncetion
-    var connection = mysql.createConnection({
-        host : 'localhost',
-        user : 'root',
-        password : 'Local@22',
-        database : 'lvdemo'
-    });
-     
-    connection.connect(function(err) {
-      if (err) {
-        console.error('error connecting: ' + err.stack);
-        return;
-      }
-      console.log('connected as id ' + connection.threadId);
+module.exports = function(){
+    
+    const sequelize = new Sequelize( process.env.DB_NAME, process.env.DB_USERNAME, process.env.DB_PASSWORD, {
+        host: process.env.DB_HOST,
+        dialect: 'mysql'
     });
 
-    return connection;
+    try {
+        sequelize.authenticate();
+        console.log('Connection has been established successfully.');
+    } catch (error) {
+        console.error('Unable to connect to the database:', error);
+    }
+
+    return sequelize;
 }

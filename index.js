@@ -9,11 +9,17 @@ const bcrypt = require('bcrypt');
 const multer  = require('multer')
 const path  = require('path')
 const fs = require('fs')
-const { promisify } = require('util')
+const { body } = require('express-validator');
 
-const unlinkAsync = promisify(fs.unlink)
+// send mail 
+// const nodemailer = require('nodemailer');
+// const { sendMail } = require('./config/mail')    ;
+
+const product = require('./models/product')(db);
+const user = require('./models/user')(db);
 
 
+// const unlinkAsync = promisify(fs.unlink)
 
 const app = express();              //Instantiate an express app, the main work horse of this server
 const port = 5000;                  //Save the port number where your server will be listening
@@ -31,6 +37,8 @@ var storage = multer.diskStorage({
 })
 var upload = multer({ storage: storage });
 // path registry.
+
+
 app.use("/uploads", express.static(path.join(__dirname, 'uploads')));
 
 app.use(cors())
@@ -41,56 +49,117 @@ var jsonParser = bodyParser.json()
 // create application/x-www-form-urlencoded parser
 var urlencodedParser = bodyParser.urlencoded({ extended: false })
 
-
 // Get products list
 app.get('/products', function (req, res) {
-    db.query("SELECT * FROM product", function (err, result) {
-        if (err) throw err;
-        res.send(sendResponse(true, 'success', result));
-        
-    });
+
+    // Send mail 
+    // const mailData = {
+    //     from: 'raghu.prajapati@concettolabs.com',  // sender address
+    //     to: 'raghu.concettolabs@gmail.com',   // list of receivers
+    //     subject: 'Updated code with read status',
+    //     text: 'That was easy!',
+    //     html: `<b>Hey Raghu </b> <br> This is our first message sent with Nodemailer<br/>`,
+    //     attachments: [
+    //         {
+    //             filename: "shiv.jpeg",
+    //             path: "http://127.0.0.1:5000/uploads/image-1649828604622.jpeg",
+    //             cid: "unique@nodemailer.com"
+    //         }
+    //     ],
+    //     dsn: {
+    //         id: 'lskdfmn23oriu2309rklfjioejrfwelf',
+    //         return: 'headers',
+    //         notify: ['failure', 'delay', 'success'],
+    //         recipient: 'raghu.prajapati@concettolabs.com'
+    //     }
+    // };
+    // sendMail(mailData)
+
+    
+
+    let options = ['id', 'ASC'];
+    if(req.query.sort!=null){
+        options = ['price', req.query.sort]
+    }
+    if(req.query.newest!=null){
+        options = ['id', 'DESC']
+    }
+   
+    product.findAll({
+        order: [options]
+    }).then((products) => {
+        res.send(sendResponse(true,'success',products));
+    }).catch((err) => {
+        res.send(sendResponse(false, 'error', 'Oops! something went wrong'));
+    })
 });
 
 // Save product
-app.post('/product/store', upload.single('image'), function (req, res) {
-    const {title, price,quantity,description} = req.body;
-    const created_at = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
-    const sql = `INSERT INTO product (title, price, qty, image, description, created_at) VALUES ('${title}', ${price}, ${quantity}, NULL, '${description}', '${created_at}')`;
-    db.query(sql, function (err, result, fields) {
-        if (err) throw err;
-        res.send(sendResponse(true, 'success', result));
+app.post('/product/store', upload.single('image'), async function (req, res) {
+    
+    const productDetails = await product.create({
+        title : req.body.title,
+        price :req.body.price,
+        qty :req.body.quantity,
+        description : req.body.description,
+        category :req.body.category,
+        status :req.body.status,
+        image: req.file ? req.file.path : '',
     });
+    if(productDetails){ 
+        res.send(sendResponse(true, 'success', productDetails));
+    } else {
+        res.send(sendResponse(false, 'Oops! something went wrong'));
+    }
 });
 
-// Save product
-app.post('/product/update',upload.single('image'),  function (req, res) {
+// Update product
+app.post('/product/update',upload.single('image'), async function (req, res) {
 
-    // console.log(req.file);
-    var imagePath = req.file.path;
-    const {id,title,price,quantity,description} = req.body;
-    const updated_at = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
-    const sql = `UPDATE product SET title = '${title}', price=${price}, qty=${quantity}, description='${description}',image = '${imagePath}', updated_at='${updated_at}' WHERE id=${id}`;
-    // console.log(sql)
-    db.query(sql, function (err, result, fields) {
-        if (err) throw err;
-        res.send(sendResponse(true, 'success', result));
-    });
+    const productDetails = await product.update({
+        title : req.body.title,
+        price :req.body.price,
+        qty :req.body.quantity,
+        description : req.body.description,
+        category :req.body.category,
+        status :req.body.status,
+        image: req.file ? req.file.path : '',
+    }, { where: { id: req.body.id }});
+
+    if(productDetails){ 
+        res.send(sendResponse(true, 'success', productDetails));
+    } else {
+        res.send(sendResponse(false, 'Oops! something went wrong'));
+    }
 });
 
-// Save product
-app.post('/product/show', jsonParser, function (req, res) {
+// get product details
+app.post('/product/show', jsonParser, async function (req, res) {
     const { id } = req.body;
-    const sql = `SELECT * FROM product where id=${id}`;
-    db.query(sql, function (err, result) {
-        if (err) throw err;
-        res.send(sendResponse(true, 'success', result));
-    });
+    const productDetails = await product.findByPk(id);
+    if(productDetails){
+        res.send(sendResponse(true, 'success', productDetails));
+    } else {
+        res.send(sendResponse(false, 'Oops! something went wrong'));
+    }
 });
+
+const getCategories = async () => {
+    let myPromise = new Promise(function(resolve) {
+        db.query("SELECT * FROM categories", function (err, result) {
+            if (err) throw err;
+            console.log("first")
+            console.log(result)
+            resolve(result);
+        })
+    })
+    return await myPromise;
+}
 
 // Save product
 app.post('/product/delete', jsonParser, function (req, res) {
     const { id } = req.body;
-    const getData = `SELECT * FROM product where id=${id}`;
+    const getData = `SELECT * FROM products where id=${id}`;
     db.query(getData, function (err, result) {
         if (err) throw err;
         if(result[0].image){
@@ -100,7 +169,7 @@ app.post('/product/delete', jsonParser, function (req, res) {
             });
         }
     });
-    const sql = `DELETE FROM product where id=${id}`;
+    const sql = `DELETE FROM products where id=${id}`;
     db.query(sql, function (err, result, fields) {
         if (err) throw err;
         res.send(sendResponse(true, 'success', result));
@@ -108,44 +177,40 @@ app.post('/product/delete', jsonParser, function (req, res) {
 });
 
 // Save product
-app.post('/user/save', jsonParser, function (req, res) {
+app.post('/user/save', jsonParser, async function (req, res) {
 
-    const {name,email,password} = req.body;
+    const { password } = req.body;
     bcrypt.hash(password, 10, function(err, hash){
-        const created_at = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
-        const sql = `INSERT INTO users (name,email,password,created_at) VALUES ('${name}', '${email}', '${hash}','${created_at}')`;
-        console.log(sql)
-        db.query(sql, function (err, result, fields) {
-            if (err) throw err;
-            res.send(sendResponse(true, 'success', result));
+        const userData = user.create({
+            name : req.body.name,
+            email : req.body.email,
+            password : hash
         });
-
+        if(userData){ 
+            res.send(sendResponse(true, 'success', userData));
+        } else {
+            res.send(sendResponse(false, 'Oops! something went wrong'));
+        }
     })
-
 });
 
 // Save product
-app.post('/user/login', jsonParser, function (req, res) {
+app.post('/user/login', jsonParser, async function (req, res) {
     
-        const {email,password} = req.body;
-    if (email && password ) {
-        // var hash = bcrypt.compare(password, 10);
-        const sql = `SELECT * FROM users where email='${email}'`;
-        
-        db.query(sql, function (err, result) {
-            if (err) throw err;        
-            if (result.length > 0 ) {
-                bcrypt.compare(password, result[0].password, function(err, data) {
-                    if(data){
-                        res.send(sendResponse(true, 'success', result[0]));
-                    } else {
-                        res.send(sendResponse(false, 'Incorrect Email or Password!', result));
-                    }
-                });
-            } else {
-                res.send(sendResponse(false, 'Incorrect Email or Password!', result));
-            }           
-        });
+    const { email,password } = req.body;
+    if ( email && password ) {
+        const userDetails = await user.findOne({ where : { email } });
+        if (userDetails) {
+            bcrypt.compare(password, userDetails.password, function(err, data) {
+                if(data){
+                    res.send(sendResponse(true, 'success', userDetails));
+                } else {
+                    res.send(sendResponse(false, 'Incorrect Email or Password!', userDetails));
+                }
+            });
+        } else {
+            res.send(sendResponse(false, 'Incorrect Email or Password!'));
+        }
     } else {
         res.send(sendResponse(false, 'Please enter Username and Password!'));
     }
@@ -160,13 +225,13 @@ app.post('/user/emailexists', jsonParser, function (req, res) {
         db.query(sql, function (err, result) {
             if (err) throw err;
             if (result.length > 0 ) {
-                res.send(sendResponse(false, 'success'));
+                res.send(sendResponse(false, 'Email already exists'));
             } else {
                 res.send(sendResponse(true, 'success'));
             }           
         });
     } else {
-        res.send(sendResponse(false, 'Please eneter email address'));
+        res.send(sendResponse(false, 'Please enter email address'));
     }
 });
 
