@@ -31,6 +31,13 @@ const Products = (db) => db.define('products', {
         type: DataTypes.TEXT,
         allowNull: false
     },
+    createdBy: {
+        type: DataTypes.INTEGER,
+        allowNull: false
+    },
+    updatedBy: {
+        type: DataTypes.INTEGER,
+    },
 }, {
     
 });

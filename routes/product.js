@@ -26,39 +26,88 @@ var upload = multer({ storage: storage });
 
 
 // Get products list
-router.get('/', function(req, res) {
+router.get('/',  async function(req, res) {
 
     let options = ['id', 'ASC'];
-    let whereData = '';
-    if (req.query.sort != null) {
-        options = ['price', req.query.sort]
-    }
-    if (req.query.newest != null) {
-        options = ['id', 'DESC']
-    }
-    if (req.query.search != null) {
-        whereData = {
-            [Op.or]: [{
-                title: {
-                    [Op.substring]: req.query.search
-                }
-            }],
-            [Op.or]: [{
-                title: {
-                    [Op.substring]: req.query.search
-                }
-            }]
+    let whereData = {};
+    
+    if (Object.keys(req.query).length !== 0) {
+       
+        if (req.query.sort!=='') {
+            options = ['price', req.query.sort]
         }
-    }
+        if (req.query.newest=='DESC') {
+            options = ['id', 'DESC']
+        }
+        if (req.query.search!=='') {
+            whereSql = {
+                [Op.or]: [{
+                    title: {
+                        [Op.like]: `%${req.query.search}%`
+                    }
+                }],
+                [Op.or]: [{
+                    title: {
+                        [Op.like]: `%${req.query.search}%`
+                    }
+                }]
+            }
+            Object.assign(whereData, whereSql)
+        }
+        if (req.query.minPrice!=='') {
+            console.log("enter in min")
+            whereSql = {
+                    price: {
+                        [Op.lt]: [req.query.minPrice]
+                    }
+            }
+            Object.assign(whereData, whereSql)
+        }
+        if (req.query.maxPrice!=='') {
+            whereSql = {
+                    price: {
+                        [Op.gt]: [req.query.maxPrice]
+                    }
+            }
+            Object.assign(whereData, whereSql)
+        }
+        if (req.query.maxPrice!=='' && req.query.minPrice!=='') {
+            console.log("enter in both")
+            whereSql = {
+                    price: {
+                        [Op.between]: [req.query.minPrice, req.query.maxPrice]
+                    }
+            }
+            Object.assign(whereData, whereSql)
+        }
 
-    product.findAll({
+        
+    }
+    
+    const {count, rows} = await product.findAndCountAll({
         where: whereData,
-        order: [options]
-    }).then((products) => {
-        res.send(sendResponse(true, 'success', products));
-    }).catch((error) => {
-        res.send(sendResponse(false, error.message, 'Oops! something went wrong'));
+        order: [options],
+        offset: 0,
+        limit: 3
     })
+    
+    // console.log("my pagination")
+    // console.log(count)
+    // console.log(rows)
+
+    const getMinPrice = await product.min('price');
+    const getMaxPrice = await product.max('price');
+
+    res.send(sendResponse(true, 'success', rows, '', {max:getMaxPrice, min:getMinPrice, totalRecord: count}));
+
+    // product.findAll({
+    //     where: whereData,
+    //     order: [options]
+    // }).then((products) => {
+    //     res.send(sendResponse(true, 'success', products, '', {max:getMaxPrice, min:getMinPrice}));
+    // }).catch((error) => {
+    //     res.send(sendResponse(false, error.message, 'Oops! something went wrong'));
+    // })
 });
 // sequelize.sync({ logging: console.log })
 
@@ -73,7 +122,9 @@ router.post('/store', verifyToken ,upload.single('image'), async function(req, r
         category: req.body.category,
         status: req.body.status,
         image: req.file ? req.file.path : '',
+        createdBy: req.userID,
     });
+    console.log(productDetails)
     if (productDetails) {
         res.send(sendResponse(true, 'success', productDetails));
     } else {
@@ -92,6 +143,7 @@ router.post('/update', verifyToken, upload.single('image'), async function(req, 
         category: req.body.category,
         status: req.body.status,
         image: req.file ? req.file.path : '',
+        updatedBy: req.userID,
     }, { where: { id: req.body.id } });
 
     if (productDetails) {
