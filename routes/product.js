@@ -98,16 +98,16 @@ router.get('/',  async function(req, res) {
     const getMinPrice = await product.min('price');
     const getMaxPrice = await product.max('price');
 
-    res.send(sendResponse(true, 'success', rows, '', {max:getMaxPrice, min:getMinPrice, totalRecord: count}));
+    // res.send(sendResponse(true, 'success', rows, '', {max:getMaxPrice, min:getMinPrice, totalRecord: count}));
 
-    // product.findAll({
-    //     where: whereData,
-    //     order: [options]
-    // }).then((products) => {
-    //     res.send(sendResponse(true, 'success', products, '', {max:getMaxPrice, min:getMinPrice}));
-    // }).catch((error) => {
-    //     res.send(sendResponse(false, error.message, 'Oops! something went wrong'));
-    // })
+    product.findAll({
+        where: whereData,
+        order: [options]
+    }).then((products) => {
+        res.send(sendResponse(true, 'success', products, '', {max:getMaxPrice, min:getMinPrice}));
+    }).catch((error) => {
+        res.send(sendResponse(false, error.message, 'Oops! something went wrong'));
+    })
 });
 // sequelize.sync({ logging: console.log })
 
