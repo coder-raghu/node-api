@@ -12,6 +12,17 @@ require('dotenv').config()
 const user = require('../models/user')(db);
 
 
+// get all users
+router.get('/',  async function(req, res) {
+
+    const users = user.findAll()
+    .then((users) => {
+        res.send(sendResponse(true, 'success', users));
+    }).catch((error) => {
+        res.send(sendResponse(false, error.message, 'Oops! something went wrong'));
+    })
+});
+
 // Register user
 router.post('/save', async function(req, res) {
 
